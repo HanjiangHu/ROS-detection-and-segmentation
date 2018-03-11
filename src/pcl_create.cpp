@@ -26,6 +26,9 @@
 #include<list>
 #include <time.h>
 #include<stdio.h>
+#include <Eigen/Core>
+#include <Eigen/Geometry>
+#include<Eigen/Dense>
 #include <SegmenterLight.h>
 #include "test_detector.h"
 
@@ -60,17 +63,52 @@ char * datacfg = const_cast<char*>(("/home/huhanjiang/catkin_ws/src/ros_seg/data
 char * cfgfile = const_cast<char*>(("/home/huhanjiang/catkin_ws/src/ros_seg/data/yolo.cfg"));//tiny-yolo-voc yolo
 char * weightfile = const_cast<char*>(("/home/huhanjiang/catkin_ws/src/ros_seg/data/yolo.weights"));//tiny-yolo-voc yolo
 char * filename = const_cast<char*>(("/home/huhanjiang/catkin_ws/src/ros_seg/data/rgb.png"));// /home/huhanjiang/catkin_ws/src/ros_seg/data/rgb0.png
-
+Eigen::Matrix4f Tr ;//= Eigen::Matrix4f::Zero();//r2i
+/*Tr(0,0) = 0.9996;Tr(0,1) = 0.0080;Tr(0,2) = -0.0282;Tr(0,3) = -19.7045;
+Tr(1,0) = -0.082;Tr(1,1) = 0.9999;Tr(1,2) = -0.0072;Tr(1,3) = -2.2495;
+Tr(2,0) = 0.0281;Tr(2,1) = 0.0075;Tr(2,2) = 0.9996;Tr(2,3) = 36.9214;
+Tr(3,0) = 0;Tr(3,1) = 0;Tr(3,2) = 0;Tr(3,3) = 1.0000;*/
+/*Tr << 0.9996,    0.0080,   -0.0282,  -19.7045,
+   -0.0082,    0.9999,   -0.0072,   -2.2495,
+    0.0281,    0.0075,    0.9996,   36.9214,
+         0,         0,         0,    1.0000;*/
+Eigen::Vector4f originalVector;//ir下
+Eigen::Vector4f newVector;//rgb下
 void cloudCB(const sensor_msgs::PointCloud2 &input)
 {
-    pcl::PointCloud<pcl::PointXYZRGBA> cloud;
+    pcl::PointCloud<pcl::PointXYZRGB> cloud;
     pcl::fromROSMsg(input, cloud);
-	//cloud.setKeepOrganized(true);
-    pcl::io::savePCDFileASCII ("/home/huhanjiang/segment/SegmenterLight/bin/seg_yolo.pcd", cloud);
+    //pcl::io::savePCDFileASCII ("/home/huhanjiang/segment/SegmenterLight/bin/seg_yolo.pcd", cloud);
 	
 	 //get point clouds
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr pcl_cloud(new pcl::PointCloud<pcl::PointXYZRGB>);
-    pcl::io::loadPCDFile("/home/huhanjiang/segment/SegmenterLight/bin/seg_yolo.pcd", *pcl_cloud);
+    *pcl_cloud = cloud;
+    /*Tr <<     0.9998,   -0.0021,    0.0211,  -21.3212,
+    0.0016,   0.9998,    0.0216,  -41.3857,
+   -0.0211,   -0.0215,    0.9995,   18.5756,
+         0,         0,         0,    1.0000;
+    unsigned pWidth = pcl_cloud->width;
+    unsigned pHeight = pcl_cloud->height;*/
+    unsigned position = 0;
+    /*for (unsigned row = 0; row < pHeight; row++) {
+      for (unsigned col = 0; col < pWidth; col++) {
+        position = row * pWidth + col;
+        //pcl::PointXYZRGB &pt = pcl_cloud->points[position];
+        originalVector(0,0) = pcl_cloud->points[position].x;
+        originalVector(1,0) = pcl_cloud->points[position].y;
+        originalVector(2,0) = pcl_cloud->points[position].z;
+        originalVector(3,0) = 1;
+        newVector = Tr * originalVector;
+        pcl_cloud->points[position].x = newVector(0,0);
+        pcl_cloud->points[position].y = newVector(1,0);
+        pcl_cloud->points[position].z = newVector(2,0);
+        /*pcl_cloud->points[position].r = pt.r;
+        pcl_cloud->points[position].g = pt.g;
+        pcl_cloud->points[position].b = pt.b;
+      }
+    }*/
+    //pcl::io::savePCDFileASCII ("/home/huhanjiang/seg_yolo_new2.pcd", *pcl_cloud);
+
     //get labeled
     pcl::PointCloud<pcl::PointXYZRGBL>::Ptr pcl_cloud_labeled(new pcl::PointCloud<pcl::PointXYZRGBL>);
 	pcl_cloud_labeled.reset(new pcl::PointCloud<pcl::PointXYZRGBL>);
@@ -78,18 +116,13 @@ void cloudCB(const sensor_msgs::PointCloud2 &input)
     segment::SegmenterLight seg(modelPath);
     seg.setFast(true);
     seg.setDetail(2);
-    //cout << "h" <<endl;
     pcl_cloud_labeled = seg.processPointCloud(pcl_cloud);
-    //cout << "hh" <<endl;
-    
-    sensor_msgs::PointCloud2 output;
 
     //get rgb img
     cv::Mat_<cv::Vec3b> src;
     PCLCloud2Image(pcl_cloud, src);
-    //cv::imshow("saf", src);
-    //cv::waitKey(0);
     cv::imwrite("/home/huhanjiang/catkin_ws/src/ros_seg/data/rgb.png", src);
+
     //yolo
     unsigned centerRow ,row_begin=89 ,row_end=150 ;//35/89  89/150
     unsigned centerCol ,col_begin=389 ,col_end=442 ;//385/433   389/442
@@ -122,17 +155,16 @@ void cloudCB(const sensor_msgs::PointCloud2 &input)
   pcl::PointCloud<pcl::PointXYZRGBL>::Ptr target_cloud(new pcl::PointCloud<pcl::PointXYZRGBL>);
   unsigned pcWidth = pcl_cloud_labeled -> width ;
   unsigned pcHeight = pcl_cloud_labeled -> height;
-  unsigned position = 0;
-  //unsigned centerRow ,row_begin ,row_end ;//35/89  89/150
-  //unsigned centerCol ,col_begin ,col_end ;//385/433   389/442
+  position = 0;
+  
   std::vector<pcl::PointXYZRGBL> sameLabel;//相同标签的点存在顺序表里面
-  sameLabel.push_back(pcl_cloud_labeled -> points[(row_begin + 10) * pcWidth + (col_begin + 15)]);
+  sameLabel.push_back(pcl_cloud_labeled -> points[(row_begin ) * pcWidth + (col_begin )]);
   std::list< std::vector<pcl::PointXYZRGBL> > difLabel;//不同标签的点云 链表
   difLabel.push_back(sameLabel);
   std::list< std::vector<pcl::PointXYZRGBL> >::iterator itr = difLabel.begin(),itre;
   int flag = 0;
-    for (unsigned row = row_begin ; row < row_end +20; row++) {//+5
-      for (unsigned col = col_begin ; col < col_end+15 ; col++) {//+25
+    for (unsigned row = row_begin ; row < row_end; row++) {//+5
+      for (unsigned col = col_begin ; col < col_end ; col++) {//+25
         position = row * pcWidth + col;
         //pcl_cloud_labeled -> points[centerRow * pcWidth + centerCol].label
         //target_cloud -> points.push_back(pcl_cloud_labeled -> points[position]);
@@ -159,7 +191,7 @@ void cloudCB(const sensor_msgs::PointCloud2 &input)
     }
     
     int max = 0;
-  while(target_cloud -> points.size() < 5000){
+  while(target_cloud -> points.size() < 300){//设置预期目标点云下限
     if(max != 0) {
       difLabel.erase(itre);
       max = 0;
@@ -177,7 +209,10 @@ void cloudCB(const sensor_msgs::PointCloud2 &input)
     for(int i = 0; i < max; i++)
       if((itre -> back()).label != 255 ) //   remove the invalid points
         target_cloud -> points.push_back((*itre)[i]);
-      else std::cout << "但是这次不算。。。："<<max <<std::endl;
+      else {
+        std::cout << "但是这次不算。。。："<<max <<std::endl;
+        break;
+      }
     std::cout << "一共：" <<target_cloud -> points.size() << std::endl<< std::endl;
   }
   char *thisTarget;
@@ -188,162 +223,26 @@ void cloudCB(const sensor_msgs::PointCloud2 &input)
   thisTarget = strcat(target_pc,buff);
   
   pcl::io::savePCDFileBinary(strcat(thisTarget,".pcd"), *target_cloud );//setup dataset
-  //pcl::io::savePCDFileASCII ("tar_rgbl.pcd", *target_cloud);
 
    
-    //Convert the cloud to ROS message
-    pcl::toROSMsg(*target_cloud, output);
-    output.header.frame_id = "map";
+  //Convert the cloud to ROS message
+  sensor_msgs::PointCloud2 output;
+  pcl::toROSMsg(*target_cloud, output);
+  output.header.frame_id = "map";
 	pcl_pub.publish(output);
   counter++;
-    for(int i=0;i<10;i++)  
-        free(test.selected[i]);  
-    free(test.selected); 
-	
+  for(int i=0;i<10;i++)  free(test.selected[i]);  
+  free(test.selected); 
 }
-
-/*main (int argc, char **argv)
-{
-    ros::init (argc, argv, "pcl_create");
-    ros::NodeHandle nh;
-    ros::Publisher pcl_pub = nh.advertise<sensor_msgs::PointCloud2> ("pcl_output", 1);
-    //get point clouds
-    pcl::PointCloud<pcl::PointXYZRGB>::Ptr pcl_cloud(new pcl::PointCloud<pcl::PointXYZRGB>);
-    pcl::io::loadPCDFile("/home/huhanjiang/catkin_ws/src/ros_seg/pcd/seg_yolo.pcd", *pcl_cloud);
-    //get labeled
-    pcl::PointCloud<pcl::PointXYZRGBL>::Ptr pcl_cloud_labeled(new pcl::PointCloud<pcl::PointXYZRGBL>);
-	pcl_cloud_labeled.reset(new pcl::PointCloud<pcl::PointXYZRGBL>);
-    std::string modelPath = "/home/huhanjiang/catkin_ws/src/ros_seg/model/";
-    segment::SegmenterLight seg(modelPath);
-    seg.setFast(true);
-    seg.setDetail(2);
-    //cout << "h" <<endl;
-    pcl_cloud_labeled = seg.processPointCloud(pcl_cloud);
-    //cout << "hh" <<endl;
-    
-    sensor_msgs::PointCloud2 output;
-
-    //get rgb img
-    cv::Mat_<cv::Vec3b> src;
-    PCLCloud2Image(pcl_cloud, src);
-    //cv::imshow("saf", src);
-    //cv::waitKey(0);
-    cv::imwrite("/home/huhanjiang/catkin_ws/src/ros_seg/data/rgb.png", src);
-    //yolo
-    unsigned centerRow ,row_begin=89 ,row_end=150 ;//35/89  89/150
-    unsigned centerCol ,col_begin=389 ,col_end=442 ;//385/433   389/442
-    char * datacfg = const_cast<char*>(("/home/huhanjiang/catkin_ws/src/ros_seg/data/voc.data"));
-    char * cfgfile = const_cast<char*>(("/home/huhanjiang/catkin_ws/src/ros_seg/data/yolo.cfg"));//tiny-yolo-voc
-    char * weightfile = const_cast<char*>(("/home/huhanjiang/catkin_ws/src/ros_seg/data/yolo.weights"));//tiny-yolo-voc
-    char * filename = const_cast<char*>(("/home/huhanjiang/catkin_ws/src/ros_seg/data/dog.jpg"));
-    detection test = detector1(datacfg,cfgfile,weightfile ,filename,0.24,0.5,0,0);
-    std::cout << "hhh" << std:: endl;
-    for(int i = 0; i < 10; i++){
-            if(test.selected[i][0] != -1){
-                if(test.names[test.selected[i][1]] == "cup") {
-                    row_begin = HEIGHT * (test.pos[test.selected[i][0]].y - test.pos[test.selected[i][0]].h/2);
-                    row_end = HEIGHT * (test.pos[test.selected[i][0]].y + test.pos[test.selected[i][0]].h/2);
-                    col_begin = WIDTH * (test.pos[test.selected[i][0]].x - test.pos[test.selected[i][0]].w/2);
-                    col_end = WIDTH * (test.pos[test.selected[i][0]].x + test.pos[test.selected[i][0]].w/2);
-                    break;
-                }
-            }
-        else {
-            std::cout << "没有检测到杯子诶，再试一下吧" << std:: endl;
-            break;
-            }
-        }
-
-    
-    //segment of labeled point cloud
-  std::cout << pcl_cloud_labeled -> width <<std::endl;
-  std::cout << pcl_cloud_labeled -> height <<std::endl;
-  pcl::PointCloud<pcl::PointXYZRGBL>::Ptr target_cloud(new pcl::PointCloud<pcl::PointXYZRGBL>);
-  unsigned pcWidth = pcl_cloud_labeled -> width ;
-  unsigned pcHeight = pcl_cloud_labeled -> height;
-  unsigned position = 0;
-  //unsigned centerRow ,row_begin ,row_end ;//35/89  89/150
-  //unsigned centerCol ,col_begin ,col_end ;//385/433   389/442
-  std::vector<pcl::PointXYZRGBL> sameLabel;
-  sameLabel.push_back(pcl_cloud_labeled -> points[36 * pcWidth + 405]);
-  std::list< std::vector<pcl::PointXYZRGBL> > difLabel;
-  difLabel.push_back(sameLabel);
-  std::list< std::vector<pcl::PointXYZRGBL> >::iterator itr = difLabel.begin(),itre;
-  int flag = 0;
-    for (unsigned row = row_begin + 5 ; row < row_end + 5; row++) {
-      for (unsigned col = col_begin + 25 ; col < col_end + 25; col++) {
-        position = row * pcWidth + col;
-        //pcl_cloud_labeled -> points[centerRow * pcWidth + centerCol].label
-        //target_cloud -> points.push_back(pcl_cloud_labeled -> points[position]);
-        if(pcl_cloud_labeled -> points[position].label == (itr -> back()).label){
-          itr -> push_back(pcl_cloud_labeled -> points[position]);//label和上一个一样
-        }
-        else{
-          itr = difLabel.begin();//从头开始
-          flag = 0;
-          while(pcl_cloud_labeled -> points[position].label != (itr -> back()).label){
-            itre = difLabel.end();//itre是最后一个元素的下一个元素！！！
-            if(++itr == itre) {//新的一个label
-              std::vector<pcl::PointXYZRGBL> newLabel;
-              newLabel.push_back(pcl_cloud_labeled -> points[position]);
-              difLabel.push_back(newLabel);
-              flag = 1;
-              --itr;
-            }
-          }
-          if(flag == 0)
-            itr -> push_back(pcl_cloud_labeled -> points[position]);
-        } 
-      }
-    }
-    int max = 0;
-  while(target_cloud -> points.size() < 2000){
-    if(max != 0) {
-      difLabel.erase(itre);
-      max = 0;
-      itre = difLabel.begin();
-    }
-    for(itr = difLabel.begin();itr != difLabel.end(); itr++){
-    if(itr -> size() > max){//itr -> size() > max
-      max = itr -> size();
-      itre = itr;
-      }
-    }
-    std::cout << max <<std::endl;  
-    std::cout << (*itre)[0].label <<std::endl;
-    std::cout << (itre -> back()).label <<std::endl;
-    for(int i = 0; i < max; i++)
-      target_cloud -> points.push_back((*itre)[i]);
-  }
-  
-  //pcl::io::savePCDFileBinary("tar_rgbl2.pcd", *target_cloud );
-  //pcl::io::savePCDFileASCII ("tar_rgbl.pcd", *target_cloud);
-
-   
-    //Convert the cloud to ROS message
-    pcl::toROSMsg(*target_cloud, output);
-    output.header.frame_id = "map";
-
-    ros::Rate loop_rate(1);
-    while (ros::ok())
-    {
-        pcl_pub.publish(output);
-        ros::spinOnce();
-        loop_rate.sleep();
-    }
-
-    return 0;
-}*/
-
 
 main (int argc, char **argv)
 {
     ros::init (argc, argv, "pcl_create");
 
     ros::NodeHandle nh;
-	pcl_pub = nh.advertise<sensor_msgs::PointCloud2> ("pcl_output", 1);
+	  pcl_pub = nh.advertise<sensor_msgs::PointCloud2> ("pcl_target", 1);
     ros::Subscriber bat_sub = nh.subscribe("/camera/depth_registered/points", 1, cloudCB);//pcl_output
-	
+	///camera/depth_registered/points   registered_cloud
     ros::spin();
 
     return 0;

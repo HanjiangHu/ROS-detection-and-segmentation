@@ -30,7 +30,7 @@ find_package(PCL REQUIRED)
 
 #find_package(Boost REQUIRED COMPONENTS system)
 find_package(OpenCV REQUIRED)
-
+include_directories( "/usr/include/eigen3" )
 ## Add include directories
 include_directories(include
 	  ${PCL_INCLUDE_DIRS}
@@ -139,13 +139,14 @@ link_directories(${YOLO_LINK_LIBRARAY})
 ## Declare a cpp executable
 
 add_executable(pcl_create src/pcl_create.cpp)
-
+add_executable(registered src/registered.cpp)
  ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
 # add_dependencies(retrorov_model_bathymetric_node retrorov_model_bathymetric_generate_messages_cpp)
 
 ## Specify libraries to link a library or executable target against
 target_link_libraries(pcl_create ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBRARIES} v4rTomGine v4rSegmenterLight darknet)
+target_link_libraries(registered ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBRARIES})
 
 #############
 ## Install ##
