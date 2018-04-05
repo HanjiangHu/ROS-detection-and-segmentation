@@ -59,9 +59,9 @@ void PCLCloud2Image(const pcl::PointCloud<pcl::PointXYZRGB>::Ptr & pcl_cloud, cv
 }
 ros::Publisher pcl_pub ;
 int counter = 0;
-char * datacfg = const_cast<char*>(("/home/huhanjiang/catkin_ws/src/ros_seg/data/coco.data"));//voc.data
-char * cfgfile = const_cast<char*>(("/home/huhanjiang/catkin_ws/src/ros_seg/data/yolo.cfg"));//tiny-yolo-voc yolo
-char * weightfile = const_cast<char*>(("/home/huhanjiang/catkin_ws/src/ros_seg/data/yolo.weights"));//tiny-yolo-voc yolo
+char * datacfg = const_cast<char*>(("/home/huhanjiang/catkin_ws/src/ros_seg/data/test.data"));//voc.data
+char * cfgfile = const_cast<char*>(("/home/huhanjiang/catkin_ws/src/ros_seg/data/yolo-voc.2.0.cfg"));//tiny-yolo-voc yolo
+char * weightfile = const_cast<char*>(("/home/huhanjiang/catkin_ws/src/ros_seg/data/yolo-voc_30000.weights"));//tiny-yolo-voc yolo
 char * filename = const_cast<char*>(("/home/huhanjiang/catkin_ws/src/ros_seg/data/rgb.png"));// /home/huhanjiang/catkin_ws/src/ros_seg/data/rgb0.png
 Eigen::Matrix4f Tr ;//= Eigen::Matrix4f::Zero();//r2i
 /*Tr(0,0) = 0.9996;Tr(0,1) = 0.0080;Tr(0,2) = -0.0282;Tr(0,3) = -19.7045;
@@ -132,7 +132,7 @@ void cloudCB(const sensor_msgs::PointCloud2 &input)
     for(int i = 0; i < 10; i++){
             if(test.selected[i][0] != -1){
               std::cout << test.names[test.selected[i][1]] << std::endl;
-                if(0 == strcmp(test.names[test.selected[i][1]], "cup")) {
+                if((0 == strcmp(test.names[test.selected[i][1]], "box")) ||(0 == strcmp(test.names[test.selected[i][1]], "mouse")) || (0 == strcmp(test.names[test.selected[i][1]], "car"))) {
                     row_begin = HEIGHT * (test.pos[test.selected[i][0]].y - test.pos[test.selected[i][0]].h/2);
                     row_end = HEIGHT * (test.pos[test.selected[i][0]].y + test.pos[test.selected[i][0]].h/2);
                     col_begin = WIDTH * (test.pos[test.selected[i][0]].x - test.pos[test.selected[i][0]].w/2);
@@ -141,7 +141,7 @@ void cloudCB(const sensor_msgs::PointCloud2 &input)
                 }
             }
         else {
-            std::cout << "没有检测到杯子诶，再试一下吧" << std:: endl;
+            std::cout << "没有检测到盒子诶，再试一下吧" << std:: endl;
             break;
             }
         }
@@ -191,7 +191,7 @@ void cloudCB(const sensor_msgs::PointCloud2 &input)
     }
     
     int max = 0;
-  while(target_cloud -> points.size() < 300){//设置预期目标点云下限
+  while(target_cloud -> points.size() < 2600){//设置预期目标点云下限
     if(max != 0) {
       difLabel.erase(itre);
       max = 0;
@@ -207,7 +207,7 @@ void cloudCB(const sensor_msgs::PointCloud2 &input)
     std::cout << "这次有："<<max <<std::endl;  
     std::cout <<" label:" <<(*itre)[0].label <<std::endl;
     for(int i = 0; i < max; i++)
-      if((itre -> back()).label != 255 ) //   remove the invalid points
+      if(((itre -> back()).label != 255) &&((itre -> back()).label != 1100)) //   remove the invalid points
         target_cloud -> points.push_back((*itre)[i]);
       else {
         std::cout << "但是这次不算。。。："<<max <<std::endl;
@@ -215,14 +215,14 @@ void cloudCB(const sensor_msgs::PointCloud2 &input)
       }
     std::cout << "一共：" <<target_cloud -> points.size() << std::endl<< std::endl;
   }
-  char *thisTarget;
+  /*char *thisTarget;
   char target_pc[20] ="target";
   char buff[5];
   sprintf(buff,"%d",counter);
  
   thisTarget = strcat(target_pc,buff);
   
-  pcl::io::savePCDFileBinary(strcat(thisTarget,".pcd"), *target_cloud );//setup dataset
+  pcl::io::savePCDFileBinary(strcat(thisTarget,".pcd"), *target_cloud );*///setup dataset
 
    
   //Convert the cloud to ROS message

@@ -1,0 +1,6 @@
+classes= 20
+train  = /home/huhanjiang/建立数据集/txt_img/train.txt
+valid  = /home/huhanjiang/建立数据集/txt_img/train.txt
+names = /home/huhanjiang/darknet/data/test.names
+backup = backup
+
