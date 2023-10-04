@@ -5,6 +5,8 @@ The RGBD camera is Astra of ORBBEC and the ROS SDK is supposed to be installed f
 
 ## Compile and prepare
 ### YOLO-darknet
+**Note that more details about the instructions and the code of ROS-YOLO can be found [here](https://github.com/HanjiangHu/ROS-YOLO-module)**. Sorry for the confusion.
+
 Download the the pretrained model from [YOLO-v2](https://pjreddie.com/darknet/yolov2/) under the path `./darknet` and `./data`.
 
 Change the path on line 231 in the file `image.c` in `./darknet/src` to your own path.
